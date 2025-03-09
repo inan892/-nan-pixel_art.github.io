@@ -10,11 +10,13 @@
             background-color: #f4f7fa;
             color: #333;
             text-align: center;
-            padding: 40px;
+            margin: 0;
+            padding: 20px;
+            box-sizing: border-box;
         }
         h1 {
             color: #5a2a83;
-            font-size: 36px;
+            font-size: 28px;
             margin-bottom: 20px;
         }
         canvas {
@@ -22,20 +24,26 @@
             background-color: #fff;
             margin-top: 20px;
             box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+            max-width: 100%;
         }
         #controls {
             margin-top: 20px;
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 10px;
         }
         button, select {
             background-color: #5a2a83;
             color: #fff;
-            padding: 10px 20px;
+            padding: 12px 25px;
             border: none;
-            border-radius: 5px;
-            margin: 0 10px;
+            border-radius: 8px;
             cursor: pointer;
             font-size: 16px;
             transition: background-color 0.3s ease;
+            width: 100%;
+            max-width: 150px;
         }
         button:hover, select:hover {
             background-color: #a243a2;
@@ -44,23 +52,20 @@
             transform: scale(0.98);
         }
         select {
-            padding: 10px;
             font-size: 16px;
-            border-radius: 5px;
-            border: 1px solid #ccc;
+            border-radius: 8px;
             margin-bottom: 20px;
-            background-color: #fff;
-            color: #5a2a83;
         }
         #colorPalette {
             display: flex;
             justify-content: center;
+            flex-wrap: wrap;
             margin-top: 20px;
         }
         .colorBox {
-            width: 40px;
-            height: 40px;
-            margin: 0 5px;
+            width: 50px;
+            height: 50px;
+            margin: 10px;
             border-radius: 50%;
             cursor: pointer;
             transition: transform 0.3s ease;
@@ -68,6 +73,35 @@
         .colorBox:hover {
             transform: scale(1.1);
             border: 2px solid #fff;
+        }
+        .colorBox:active {
+            transform: scale(0.95);
+        }
+        .tools {
+            margin-top: 20px;
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+        }
+        .tools button {
+            width: 40px;
+            height: 40px;
+        }
+        .tools button:active {
+            transform: scale(0.9);
+        }
+        @media (min-width: 600px) {
+            h1 {
+                font-size: 36px;
+            }
+            canvas {
+                max-width: 320px;
+                margin: 20px auto;
+            }
+            .colorBox {
+                width: 60px;
+                height: 60px;
+            }
         }
     </style>
 </head>
@@ -86,6 +120,10 @@
         <button id="undo">Geri Al</button>
         <button id="eraser">Silgi</button>
         <button id="save">PNG Olarak Kaydet</button>
+    </div>
+
+    <div id="tools" class="tools">
+        <button id="brushTool">Fırça</button>
     </div>
 
     <div id="colorPalette">
@@ -107,11 +145,12 @@
         let pixelSize = 16;
         let isPainting = false;
         let isErasing = false;
+        let isRectTool = false;
+        let selectedColor = '#000000'; 
         const history = [];
         let currentStateIndex = -1;
-        let selectedColor = '#000000'; // Varsayılan renk siyah
 
-        // Boyut değiştirildiğinde
+        // Boyut seçimi
         document.getElementById('size').addEventListener('change', function() {
             pixelSize = parseInt(this.value);
             drawGrid();
@@ -140,7 +179,7 @@
             this.innerText = isErasing ? 'Boyama' : 'Silgi';
         });
 
-        // Kaydetme
+        // PNG olarak kaydetme
         document.getElementById('save').addEventListener('click', function() {
             const dataURL = canvas.toDataURL('image/png');
             const link = document.createElement('a');
@@ -149,7 +188,19 @@
             link.click();
         });
 
-        // Tuval üzerine çizim yapma
+        // Dikdörtgen aracı seçimi
+        document.getElementById('rectTool').addEventListener('click', function() {
+            isRectTool = !isRectTool;
+            this.style.backgroundColor = isRectTool ? '#a243a2' : '#5a2a83';
+        });
+
+        // Fırça aracı seçimi
+        document.getElementById('brushTool').addEventListener('click', function() {
+            isRectTool = false;
+            document.getElementById('rectTool').style.backgroundColor = '#5a2a83';
+        });
+
+        // Tuval üzerine çizim
         canvas.addEventListener('mousedown', function(event) {
             isPainting = true;
             paint(event);
@@ -175,28 +226,21 @@
                 ctx.clearRect(x, y, pixelSize, pixelSize);
             } else {
                 ctx.fillStyle = selectedColor;
-                ctx.fillRect(x, y, pixelSize, pixelSize);
+                if (isRectTool) {
+                    ctx.fillRect(x, y, pixelSize * 2, pixelSize); // Dikdörtgen şekli
+                } else {
+                    ctx.fillRect(x, y, pixelSize, pixelSize); // Fırça şekli
+                }
             }
 
             saveState();
-        }
-
-        // Tuvali sıfırlama ve ızgara çizme
-        function drawGrid() {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            for (let x = 0; x < canvas.width; x += pixelSize) {
-                for (let y = 0; y < canvas.height; y += pixelSize) {
-                    ctx.strokeStyle = '#ccc';
-                    ctx.strokeRect(x, y, pixelSize, pixelSize);
-                }
-            }
         }
 
         // Durum kaydetme
         function saveState() {
             const data = canvas.toDataURL();
             if (currentStateIndex < history.length - 1) {
-                history.splice(currentStateIndex + 1); // Eğer ortada bir değişiklik varsa, tarihçeyi kesiyoruz
+                history.splice(currentStateIndex + 1);
             }
             history.push(data);
             currentStateIndex++;
@@ -212,10 +256,20 @@
             }
         }
 
-        // Başlangıçta ızgara çiz
+        // Başlangıçta ızgara çizme
         drawGrid();
-    </script>
-    <p style="italic">Made By İnan</p>
 
+        function drawGrid() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            for (let x = 0; x < canvas.width; x += pixelSize) {
+                for (let y = 0; y < canvas.height; y += pixelSize) {
+                    ctx.strokeStyle = '#ccc';
+                    ctx.strokeRect(x, y, pixelSize, pixelSize);
+                }
+            }
+        }
+    </script>
+<br>
+<p>Made By İnan</p>
 </body>
 </html>
