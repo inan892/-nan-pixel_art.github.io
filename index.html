@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pixel Art Boyama</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            background-color: #f4f7fa;
+            color: #333;
+            text-align: center;
+            padding: 40px;
+        }
+        h1 {
+            color: #5a2a83;
+            font-size: 36px;
+            margin-bottom: 20px;
+        }
+        canvas {
+            border: 3px solid #5a2a83;
+            background-color: #fff;
+            margin-top: 20px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+        }
+        #controls {
+            margin-top: 20px;
+        }
+        button, select {
+            background-color: #5a2a83;
+            color: #fff;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            margin: 0 10px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background-color 0.3s ease;
+        }
+        button:hover, select:hover {
+            background-color: #a243a2;
+        }
+        button:active {
+            transform: scale(0.98);
+        }
+        select {
+            padding: 10px;
+            font-size: 16px;
+            border-radius: 5px;
+            border: 1px solid #ccc;
+            margin-bottom: 20px;
+            background-color: #fff;
+            color: #5a2a83;
+        }
+        #colorPalette {
+            display: flex;
+            justify-content: center;
+            margin-top: 20px;
+        }
+        .colorBox {
+            width: 40px;
+            height: 40px;
+            margin: 0 5px;
+            border-radius: 50%;
+            cursor: pointer;
+            transition: transform 0.3s ease;
+        }
+        .colorBox:hover {
+            transform: scale(1.1);
+            border: 2px solid #fff;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Pixel Art Boyama</h1>
+
+    <label for="size">Boyut Seçin:</label>
+    <select id="size">
+        <option value="16">16x16</option>
+        <option value="32">32x32</option>
+        <option value="64">64x64</option>
+    </select>
+
+    <div id="controls">
+        <button id="undo">Geri Al</button>
+        <button id="eraser">Silgi</button>
+        <button id="save">PNG Olarak Kaydet</button>
+    </div>
+
+    <div id="colorPalette">
+        <div class="colorBox" style="background-color: #ff0000;" data-color="#ff0000"></div>
+        <div class="colorBox" style="background-color: #00ff00;" data-color="#00ff00"></div>
+        <div class="colorBox" style="background-color: #0000ff;" data-color="#0000ff"></div>
+        <div class="colorBox" style="background-color: #ffff00;" data-color="#ffff00"></div>
+        <div class="colorBox" style="background-color: #00ffff;" data-color="#00ffff"></div>
+        <div class="colorBox" style="background-color: #ff00ff;" data-color="#ff00ff"></div>
+        <div class="colorBox" style="background-color: #000000;" data-color="#000000"></div>
+        <div class="colorBox" style="background-color: #ffffff;" data-color="#ffffff"></div>
+    </div>
+
+    <canvas id="pixelCanvas" width="320" height="320"></canvas>
+
+    <script>
+        const canvas = document.getElementById('pixelCanvas');
+        const ctx = canvas.getContext('2d');
+        let pixelSize = 16;
+        let isPainting = false;
+        let isErasing = false;
+        const history = [];
+        let currentStateIndex = -1;
+        let selectedColor = '#000000'; // Varsayılan renk siyah
+
+        // Boyut değiştirildiğinde
+        document.getElementById('size').addEventListener('change', function() {
+            pixelSize = parseInt(this.value);
+            drawGrid();
+        });
+
+        // Renk seçimi
+        document.querySelectorAll('.colorBox').forEach(box => {
+            box.addEventListener('click', function() {
+                selectedColor = this.getAttribute('data-color');
+                document.querySelectorAll('.colorBox').forEach(b => b.style.border = 'none');
+                this.style.border = '2px solid #fff';
+            });
+        });
+
+        // Geri alma
+        document.getElementById('undo').addEventListener('click', function() {
+            if (currentStateIndex > 0) {
+                currentStateIndex--;
+                redrawCanvas(history[currentStateIndex]);
+            }
+        });
+
+        // Silgi
+        document.getElementById('eraser').addEventListener('click', function() {
+            isErasing = !isErasing;
+            this.innerText = isErasing ? 'Boyama' : 'Silgi';
+        });
+
+        // Kaydetme
+        document.getElementById('save').addEventListener('click', function() {
+            const dataURL = canvas.toDataURL('image/png');
+            const link = document.createElement('a');
+            link.href = dataURL;
+            link.download = 'pixel-art.png';
+            link.click();
+        });
+
+        // Tuval üzerine çizim yapma
+        canvas.addEventListener('mousedown', function(event) {
+            isPainting = true;
+            paint(event);
+        });
+
+        canvas.addEventListener('mousemove', function(event) {
+            if (isPainting) {
+                paint(event);
+            }
+        });
+
+        canvas.addEventListener('mouseup', function() {
+            isPainting = false;
+        });
+
+        // Çizim fonksiyonu
+        function paint(event) {
+            const rect = canvas.getBoundingClientRect();
+            const x = Math.floor((event.clientX - rect.left) / pixelSize) * pixelSize;
+            const y = Math.floor((event.clientY - rect.top) / pixelSize) * pixelSize;
+
+            if (isErasing) {
+                ctx.clearRect(x, y, pixelSize, pixelSize);
+            } else {
+                ctx.fillStyle = selectedColor;
+                ctx.fillRect(x, y, pixelSize, pixelSize);
+            }
+
+            saveState();
+        }
+
+        // Tuvali sıfırlama ve ızgara çizme
+        function drawGrid() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            for (let x = 0; x < canvas.width; x += pixelSize) {
+                for (let y = 0; y < canvas.height; y += pixelSize) {
+                    ctx.strokeStyle = '#ccc';
+                    ctx.strokeRect(x, y, pixelSize, pixelSize);
+                }
+            }
+        }
+
+        // Durum kaydetme
+        function saveState() {
+            const data = canvas.toDataURL();
+            if (currentStateIndex < history.length - 1) {
+                history.splice(currentStateIndex + 1); // Eğer ortada bir değişiklik varsa, tarihçeyi kesiyoruz
+            }
+            history.push(data);
+            currentStateIndex++;
+        }
+
+        // Tuvali yeniden çizme
+        function redrawCanvas(data) {
+            const img = new Image();
+            img.src = data;
+            img.onload = function() {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                ctx.drawImage(img, 0, 0);
+            }
+        }
+
+        // Başlangıçta ızgara çiz
+        drawGrid();
+    </script>
+    <p style="italic">Made By İnan</p>
+
+</body>
+</html>
